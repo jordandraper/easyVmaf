@@ -28,6 +28,7 @@ import subprocess
 import json
 import os
 import shlex
+import platform
 from ffmpeg_progress_yield import FfmpegProgress
 
 
@@ -41,8 +42,15 @@ HD_PHONE_MODEL_NAME = 'vmaf_hd_phone'
 _4K_MODEL_VERSION = 'vmaf_4k_v0.6.1'
 _4K_MODEL_NAME = 'vmaf_4k'
 
-
-
+def clean_log_path(log_path):
+    """
+    https://github.com/Netflix/vmaf/blob/master/resource/doc/ffmpeg.md#note-about-the-model-path-on-windows for correct Windows formatting.
+    Any tags between [] will be incorrectly read by filter complex.
+    """
+    if platform.system()=="Windows":
+        log_path = log_path.replace("\\","/").replace(":","\\\\:")
+    log_path = log_path.replace("[","\\[").replace("]","\\]")
+    return log_path
 
 class FFprobe:
     '''
@@ -56,7 +64,7 @@ class FFprobe:
         - getFramesInfo()
         - getPacketsInfo()
     '''
-    cmd = config.ffprobe
+    cmd = os.environ.get('FFPROBE', config.ffprobe)
 
     def __init__(self, videoSrc, loglevel="info"):
         self.videoSrc = videoSrc
@@ -103,7 +111,7 @@ class FFmpegQos:
     Class to interact with FFmpeg QoS Filters: PSNR and VMAF. 
     Particullary, it interacts with libvmaf library through lavfi filter
     '''
-    cmd = config.ffmpeg
+    cmd = os.environ.get('FFMPEG', config.ffmpeg)
 
     def __init__(self,  main, ref, loglevel="info"):
         self.loglevel = loglevel
@@ -134,7 +142,12 @@ class FFmpegQos:
 
     def _commitFilters(self, filterName='lavfi'):
         """build the cmd for the filters"""
-        filterCmd = f'-{filterName} \'{";".join(self.main.filtersList + self.ref.filtersList + self.psnrFilter + self.vmafFilter)}\''
+        if platform.system()=="Windows":
+            quote = '"'
+        else:
+            quote = "'"
+
+        filterCmd = f'-{filterName} {quote}{";".join(self.main.filtersList + self.ref.filtersList + self.psnrFilter + self.vmafFilter)}{quote}'
         return filterCmd
 
     def getPsnr(self, stats_file=False):
@@ -174,15 +187,15 @@ class FFmpegQos:
                 log_path = os.path.splitext(self.main.videoSrc)[
                     0] + '_vmaf.json'
         self.vmafpath = log_path
+        log_path = clean_log_path(log_path)
+        self.vmaf_cambi_heatmap_path = clean_log_path(os.path.splitext(self.main.videoSrc)[0] + '_cambi_heatmap')
 
-        self.vmaf_cambi_heatmap_path = os.path.splitext(self.main.videoSrc)[0] + '_cambi_heatmap'
 
 
-
-        if model == 'HD':
+        if model in {'SD','HD'}:
             model_hd = f'version={HD_MODEL_VERSION}\\\\:name={HD_MODEL_NAME}|version={HD_NEG_MODEL_VERSION}\\\\:name={HD_NEG_MODEL_NAME}|version={HD_PHONE_MODEL_VERSION}\\\\:name={HD_PHONE_MODEL_NAME}\\\\:enable_transform=true'
             model = model_hd
-        elif model == '4K':
+        else:
             model_4k = f'version={_4K_MODEL_VERSION}\\\\:name={_4K_MODEL_NAME}'
             model = model_4k
         if threads == 0:
@@ -201,8 +214,10 @@ class FFmpegQos:
         elif features and cambi_heatmap:
             self.vmafFilter = [f'[{main}][{ref}]libvmaf=log_fmt={log_fmt}:model={model}:n_subsample={subsample}:log_path={log_path}:n_threads={threads}:shortest={shortest}:feature={features}\\\\:heatmaps_path={self.vmaf_cambi_heatmap_path}']
 
-
+        
         self._commit()
+        print(self.cmd)
+        input()
         if self.loglevel == "verbose":
             print(self.cmd, flush=True)
 

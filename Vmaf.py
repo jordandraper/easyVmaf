@@ -145,7 +145,9 @@ class vmaf():
         """ 
         initialization of resolutions for each vmaf model
         """
-        if self.model == 'HD':
+        if self.model == 'SD':
+            self.target_resolution = [720, 480]
+        elif self.model == 'HD':
             self.target_resolution = [1920, 1080]
         elif self.model == '4K':
             self.target_resolution = [3840, 2160]

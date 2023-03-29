@@ -137,8 +137,12 @@ if __name__ == '__main__':
     Distorted video path could be loaded as patterns i.e., "myFolder/video-sample-*.mp4"
     In this way, many computations could be done with just one command line.
     '''
+
     main_pattern = os.path.expanduser(main_pattern)
-    mainFiles = glob.glob(main_pattern)
+    if os.path.isfile(main_pattern):
+        mainFiles = [main_pattern]
+    else:
+        mainFiles = glob.glob(os.path.join(main_pattern,"*.*"))
 
     if not(os.path.isfile(reference)):
         print("Reference Video file not found: ", reference, flush=True)
@@ -174,7 +178,7 @@ if __name__ == '__main__':
             with open(vmafpath) as jsonFile:
                 jsonData = json.load(jsonFile)
                 for frame in jsonData['frames']:
-                    if model == 'HD':
+                    if model in {'SD','HD'}:
                         vmafScore.append(frame["metrics"][HD_MODEL_NAME])
                         vmafNegScore.append(frame["metrics"][HD_NEG_MODEL_NAME])
                         vmafPhoneScore.append(frame["metrics"][HD_PHONE_MODEL_NAME])
@@ -185,7 +189,7 @@ if __name__ == '__main__':
             tree = ET.parse(vmafpath)
             root = tree.getroot()
             for frame in root.findall('frames/frame'):
-                if model == 'HD':
+                if model in {'SD','HD'}:
                     vmafScore.append(frame["metrics"][HD_MODEL_NAME])
                     vmafNegScore.append(frame["metrics"][HD_NEG_MODEL_NAME])
                     vmafPhoneScore.append(frame["metrics"][HD_PHONE_MODEL_NAME])
@@ -197,7 +201,7 @@ if __name__ == '__main__':
         print("VMAF computed", flush=True)
         print("=======================================", flush=True)
         print("offset: ", offset, " | psnr: ", psnr)
-        if model == 'HD':
+        if model in {'SD','HD'}:
             print("VMAF HD: ", mean(vmafScore))
             print("VMAF Neg: ", mean(vmafNegScore))
             print("VMAF Phone: ", mean(vmafPhoneScore))
